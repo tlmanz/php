@@ -38,6 +38,8 @@ jobs:
 
       - name: PHP Lint and Tests
         run: |
+          php composer.phar install --no-interaction --no-progress --ignore-platform-reqs
+          yarn install --immutable
           php bin/console cache:warmup --env=dev
           php bin/phpstan analyse --no-progress --memory-limit=1G src
           php bin/console lint:yaml config
