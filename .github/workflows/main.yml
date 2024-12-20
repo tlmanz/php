@@ -62,69 +62,93 @@ jobs:
           echo "{}" > public/build/manifest.json
           php bin/simple-phpunit
 
-  deploy:
-    name: Deploy Application
-    runs-on: ubuntu-latest
+  # deploy:
+  #   name: Deploy Application
+  #   runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        environment: [staging, demo, production]
+  #   strategy:
+  #     matrix:
+  #       environment: [staging, demo, production]
 
-    environment:
-      name: ${{ matrix.environment }}
-      url: ${{ secrets[format('{0}_URL', toUpper(matrix.environment))] }}
+  #   environment:
+  #     name: ${{ matrix.environment }}
+  #     url: ${{ secrets.STAGING_URL }}
 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+  #   steps:
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v3
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.2
+  #     - name: Set up PHP
+  #       uses: shivammathur/setup-php@v2
+  #       with:
+  #         php-version: 8.2
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
+  #     - name: Set up Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: '16'
 
-      - name: Install Composer
-        run: |
-          curl -sS https://getcomposer.org/composer-2.phar -o composer.phar
-          php composer.phar install --no-dev --classmap-authoritative --no-interaction --no-progress
+  #     - name: Install Composer
+  #       run: |
+  #         curl -sS https://getcomposer.org/composer-2.phar -o composer.phar
+  #         php composer.phar install --no-dev --classmap-authoritative --no-interaction --no-progress
 
-      - name: Install Node.js Dependencies
-        run: |
-          npm install --immutable
-          npm run build
+  #     - name: Install Node.js Dependencies
+  #       run: |
+  #         npm install --immutable
+  #         npm run build
 
-      - name: Deploy to Server
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          REMOTE_SERVER: ${{ secrets[format('{0}_REMOTE_SERVER', toUpper(matrix.environment))] }}
-          REMOTE_USER: ${{ secrets[format('{0}_REMOTE_USER', toUpper(matrix.environment))] }}
-          REMOTE_PORT: ${{ secrets[format('{0}_REMOTE_PORT', toUpper(matrix.environment))] }}
-          REMOTE_BASE: ${{ secrets[format('{0}_REMOTE_BASE', toUpper(matrix.environment))] }}
-        run: |
-          TIMESTAMP=$(date +%s)
-          RELEASE="$REMOTE_BASE/releases/$TIMESTAMP"
-          SHARED="$REMOTE_BASE/shared"
+  #     - name: Set Environment Variables
+  #       id: env-vars
+  #       run: |
+  #         if [ "${{ matrix.environment }}" = "staging" ]; then
+  #           echo "url=${{ secrets.STAGING_URL }}" >> $GITHUB_OUTPUT
+  #           echo "remote_server=${{ secrets.STAGING_REMOTE_SERVER }}" >> $GITHUB_OUTPUT
+  #           echo "remote_user=${{ secrets.STAGING_REMOTE_USER }}" >> $GITHUB_OUTPUT
+  #           echo "remote_port=${{ secrets.STAGING_REMOTE_PORT }}" >> $GITHUB_OUTPUT
+  #           echo "remote_base=${{ secrets.STAGING_REMOTE_BASE }}" >> $GITHUB_OUTPUT
+  #         elif [ "${{ matrix.environment }}" = "demo" ]; then
+  #           echo "url=${{ secrets.DEMO_URL }}" >> $GITHUB_OUTPUT
+  #           echo "remote_server=${{ secrets.DEMO_REMOTE_SERVER }}" >> $GITHUB_OUTPUT
+  #           echo "remote_user=${{ secrets.DEMO_REMOTE_USER }}" >> $GITHUB_OUTPUT
+  #           echo "remote_port=${{ secrets.DEMO_REMOTE_PORT }}" >> $GITHUB_OUTPUT
+  #           echo "remote_base=${{ secrets.DEMO_REMOTE_BASE }}" >> $GITHUB_OUTPUT
+  #         else
+  #           echo "url=${{ secrets.PRODUCTION_URL }}" >> $GITHUB_OUTPUT
+  #           echo "remote_server=${{ secrets.PRODUCTION_REMOTE_SERVER }}" >> $GITHUB_OUTPUT
+  #           echo "remote_user=${{ secrets.PRODUCTION_REMOTE_USER }}" >> $GITHUB_OUTPUT
+  #           echo "remote_port=${{ secrets.PRODUCTION_REMOTE_PORT }}" >> $GITHUB_OUTPUT
+  #           echo "remote_base=${{ secrets.PRODUCTION_REMOTE_BASE }}" >> $GITHUB_OUTPUT
+  #         fi
 
-          echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
-          ssh-keyscan -p $REMOTE_PORT $REMOTE_SERVER >> ~/.ssh/known_hosts
+  #     - name: Deploy to Server
+  #       env:
+  #         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  #         REMOTE_SERVER: ${{ steps.env-vars.outputs.remote_server }}
+  #         REMOTE_USER: ${{ steps.env-vars.outputs.remote_user }}
+  #         REMOTE_PORT: ${{ steps.env-vars.outputs.remote_port }}
+  #         REMOTE_BASE: ${{ steps.env-vars.outputs.remote_base }}
+  #         ENVIRONMENT: ${{ matrix.environment }}
+  #       run: |
+  #         TIMESTAMP=$(date +%s)
+  #         RELEASE="$REMOTE_BASE/releases/$TIMESTAMP"
+  #         SHARED="$REMOTE_BASE/shared"
+
+  #         echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  #         ssh-keyscan -p $REMOTE_PORT $REMOTE_SERVER >> ~/.ssh/known_hosts
           
-          git rev-parse --verify --short HEAD > .revision
+  #         git rev-parse --verify --short HEAD > .revision
 
-          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "mkdir -p $RELEASE $SHARED/var $SHARED/var/log/archive $SHARED/public/uploads"
-          rsync --archive --stats --human-readable --exclude ".git/" --exclude "node_modules/" -e "ssh -p $REMOTE_PORT" . $REMOTE_USER@$REMOTE_SERVER:$RELEASE
-          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "cd $RELEASE; chmod u+x bin/console"
-          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "ln -sfn $RELEASE $REMOTE_BASE/current"
+  #         ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "mkdir -p $RELEASE $SHARED/var $SHARED/var/log/archive $SHARED/public/uploads"
+  #         rsync --archive --stats --human-readable --exclude ".git/" --exclude "node_modules/" -e "ssh -p $REMOTE_PORT" . $REMOTE_USER@$REMOTE_SERVER:$RELEASE
+  #         ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "cd $RELEASE; chmod u+x bin/console"
+  #         ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "ln -sfn $RELEASE $REMOTE_BASE/current"
 
-          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "sudo service php8.2-fpm restart"
-          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "cd $REMOTE_BASE/current; php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration"
+  #         ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "sudo service php8.2-fpm restart"
+  #         ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "cd $REMOTE_BASE/current; php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration"
 
-          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "ls -1d $REMOTE_BASE/releases/* | sort -rg | tail -n +5 | xargs rm -rf"
+  #         ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "ls -1d $REMOTE_BASE/releases/* | sort -rg | tail -n +5 | xargs rm -rf"
 
-      - name: Confirm Deployment Success
-        run: |
-          curl -f ${{ secrets[format('{0}_URL', toUpper(matrix.environment))] }} || (echo "Deployment failed" && exit 1)
+  #     - name: Confirm Deployment Success
+  #       run: |
+  #         curl -f ${{ steps.env-vars.outputs.url }} || (echo "Deployment failed" && exit 1)
