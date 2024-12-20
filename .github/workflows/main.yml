@@ -11,6 +11,8 @@ jobs:
   static:
     name: Static Analysis and Testing
     runs-on: ubuntu-latest
+    container:
+      image: xmmedia/php:8.2-cli
 
     env:
       APP_ENV: test
@@ -18,11 +20,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.2
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -34,9 +31,10 @@ jobs:
           curl -sS https://getcomposer.org/composer-2.phar -o composer.phar
           php composer.phar --version
 
-      - name: Install Node.js Dependencies
+      - name: Install Node.js with NVM
         run: |
-          npm install --immutable
+            export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" --no-use
+            nvm install
 
       - name: Security Checks
         run: |
