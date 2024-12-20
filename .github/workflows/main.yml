@@ -72,7 +72,7 @@ jobs:
 
     environment:
       name: ${{ matrix.environment }}
-      url: ${{ secrets["${{ matrix.environment | upper }}_URL"] }}
+      url: ${{ secrets[matrix.environment | upper | append('_URL')] }}
 
     steps:
       - name: Checkout Code
@@ -101,10 +101,10 @@ jobs:
       - name: Deploy to Server
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          REMOTE_SERVER: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_SERVER"] }}
-          REMOTE_USER: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_USER"] }}
-          REMOTE_PORT: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_PORT"] }}
-          REMOTE_BASE: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_BASE"] }}
+          REMOTE_SERVER: ${{ secrets[matrix.environment | upper | append('_REMOTE_SERVER')] }}
+          REMOTE_USER: ${{ secrets[matrix.environment | upper | append('_REMOTE_USER')] }}
+          REMOTE_PORT: ${{ secrets[matrix.environment | upper | append('_REMOTE_PORT')] }}
+          REMOTE_BASE: ${{ secrets[matrix.environment | upper | append('_REMOTE_BASE')] }}
         run: |
           TIMESTAMP=$(date +%s)
           RELEASE="$REMOTE_BASE/releases/$TIMESTAMP"
@@ -127,4 +127,4 @@ jobs:
 
       - name: Confirm Deployment Success
         run: |
-          curl -f ${{ secrets["${{ matrix.environment | upper }}_URL"] }} || (echo "Deployment failed" && exit 1)
+          curl -f ${{ secrets[matrix.environment | upper | append('_URL')] }} || (echo "Deployment failed" && exit 1)
