@@ -31,11 +31,6 @@ jobs:
           curl -sS https://getcomposer.org/composer-2.phar -o composer.phar
           php composer.phar --version
 
-      - name: Install Node.js with NVM
-        run: |
-            export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" --no-use
-            nvm install
-
       - name: Security Checks
         run: |
           symfony security:check
