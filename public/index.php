@@ -1,8 +1,9 @@
 <?php
 
-require __DIR__ . '/../vendor/autoload.php';
+use App\Kernel;
 
-use App\Example;
+require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
 
-$example = new Example();
-echo $example->sayHello();
+return function (array $context) {
+    return new Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']);
+};

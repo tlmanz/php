@@ -1,0 +1,18 @@
+{% extends "@CVTemplatesBundle/layout.html.twig" %}
+
+
+{% set viewport = 'width=device-width, initial-scale=1' %}
+
+{% block favicon %}{% endblock %}
+
+
+{# SEO #}
+
+{% set metaDescription = false %}
+
+
+{# Assets #}
+
+{% block importmap %}
+    {{ importmap('app') }}
+{% endblock %}
