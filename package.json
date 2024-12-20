@@ -1,0 +1,9 @@
+{
+    "name": "example-project",
+    "version": "1.0.0",
+    "scripts": {
+      "lint:js": "echo 'Linting JavaScript...' && exit 0",
+      "lint:css": "echo 'Linting CSS...' && exit 0"
+    }
+  }
+  

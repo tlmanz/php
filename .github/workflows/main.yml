@@ -1,0 +1,130 @@
+name: CI/CD Workflow
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    name: Static Analysis and Testing
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ENV: test
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install Composer
+        run: |
+          curl -sS https://getcomposer.org/composer-2.phar -o composer.phar
+          php composer.phar --version
+
+      - name: Install Node.js Dependencies
+        run: |
+          npm install --immutable
+
+      - name: Security Checks
+        run: |
+          symfony security:check
+          npm audit --audit-level=high
+
+      - name: PHP Lint and Tests
+        run: |
+          php bin/console cache:warmup --env=dev
+          php bin/phpstan analyse --no-progress --memory-limit=1G src
+          php bin/console lint:yaml config
+          php bin/console lint:twig templates
+          php bin/console lint:container
+
+      - name: JavaScript and CSS Linting
+        run: |
+          npm run lint:js
+          npm run lint:css
+
+      - name: PHP Unit Tests
+        run: |
+          mkdir -p public/build
+          echo "{}" > public/build/manifest.json
+          php bin/simple-phpunit
+
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        environment: [staging, demo, production]
+
+    environment:
+      name: ${{ matrix.environment }}
+      url: ${{ secrets["${{ matrix.environment | upper }}_URL"] }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install Composer
+        run: |
+          curl -sS https://getcomposer.org/composer-2.phar -o composer.phar
+          php composer.phar install --no-dev --classmap-authoritative --no-interaction --no-progress
+
+      - name: Install Node.js Dependencies
+        run: |
+          npm install --immutable
+          npm run build
+
+      - name: Deploy to Server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_SERVER: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_SERVER"] }}
+          REMOTE_USER: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_USER"] }}
+          REMOTE_PORT: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_PORT"] }}
+          REMOTE_BASE: ${{ secrets["${{ matrix.environment | upper }}_REMOTE_BASE"] }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          RELEASE="$REMOTE_BASE/releases/$TIMESTAMP"
+          SHARED="$REMOTE_BASE/shared"
+
+          echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+          ssh-keyscan -p $REMOTE_PORT $REMOTE_SERVER >> ~/.ssh/known_hosts
+          
+          git rev-parse --verify --short HEAD > .revision
+
+          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "mkdir -p $RELEASE $SHARED/var $SHARED/var/log/archive $SHARED/public/uploads"
+          rsync --archive --stats --human-readable --exclude ".git/" --exclude "node_modules/" -e "ssh -p $REMOTE_PORT" . $REMOTE_USER@$REMOTE_SERVER:$RELEASE
+          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "cd $RELEASE; chmod u+x bin/console"
+          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "ln -sfn $RELEASE $REMOTE_BASE/current"
+
+          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "sudo service php8.2-fpm restart"
+          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "cd $REMOTE_BASE/current; php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration"
+
+          ssh -p $REMOTE_PORT $REMOTE_USER@$REMOTE_SERVER "ls -1d $REMOTE_BASE/releases/* | sort -rg | tail -n +5 | xargs rm -rf"
+
+      - name: Confirm Deployment Success
+        run: |
+          curl -f ${{ secrets["${{ matrix.environment | upper }}_URL"] }} || (echo "Deployment failed" && exit 1)
